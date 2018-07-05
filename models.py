@@ -11,8 +11,9 @@ from sklearn.ensemble import AdaBoostClassifier
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 
-def linear_model(X, y, n_splits=3, **kwargs):
-  np.random.seed(666420)
+from xgboost.sklearn import XGBClassifier
+
+def linear(X, y, n_splits=3, **kwargs):
   model = Pipeline([
     ('pca', PCA(whiten=True)),
     ('lr', LogisticRegressionCV(
@@ -24,7 +25,7 @@ def linear_model(X, y, n_splits=3, **kwargs):
     ))
   ])
   search = GridSearchCV(model,
-    param_grid={'pca__n_components': np.arange(10, 20)},
+    param_grid={'pca__n_components': np.arange(1, 51)},
     cv=StratifiedKFold(n_splits=n_splits),
     scoring='neg_log_loss',
     refit=True,
@@ -37,7 +38,6 @@ def linear_model(X, y, n_splits=3, **kwargs):
   return search.best_estimator_
 
 def adaboost(X, y, n_splits=3, **kwargs):
-  np.random.seed(666420)
   model = AdaBoostClassifier(
     DecisionTreeClassifier(max_depth=1, min_samples_leaf=1))
   search = GridSearchCV(model,
@@ -55,7 +55,35 @@ def adaboost(X, y, n_splits=3, **kwargs):
   print(-search.best_score_)
   return search.best_estimator_
 
+def xgboost(X, y, n_splits=3, **kwargs):
+
+  model = XGBClassifier(
+    max_depth=1,
+    learning_rate=0.1,
+    min_child_weight=1,
+    colsample_bytree=1,
+    objective='binary:logistic'
+  )
+  search = GridSearchCV(
+    model,
+    param_grid={
+      'n_estimators': [100, 120, 140],
+      'subsample': [0.4, 0.6, 0.8],
+      'reg_lambda': [0.01, 0.1, 1],
+      'gamma': [1, 2, 4],
+    },
+    cv=StratifiedKFold(n_splits=n_splits),
+    scoring='neg_log_loss',
+    refit=True,
+    n_jobs=-1,
+    verbose=2,
+    ).fit(X, y)
+  print(search.best_params_)
+  print(-search.best_score_)
+  return search.best_estimator_
+
 classifiers = {
-  'linear': linear_model,
+  'linear': linear,
   'adaboost': adaboost,
+  'xgboost': xgboost,
 }
