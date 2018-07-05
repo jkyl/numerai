@@ -8,10 +8,6 @@ import pandas as pd
 
 from models import classifiers
 
-def get_data(train_csv, test_csv):
-  train_df, test_df = pd.read_csv(train_csv), pd.read_csv(test_csv)
-  return train_df, test_df
-
 def process_data(train_df, test_df, target):
   features = [i for i in train_df.columns if 'feature' in i]
   target = [i for i in train_df.columns if target in i]
@@ -25,10 +21,10 @@ def process_data(train_df, test_df, target):
   return full, test
 
 def main(args):
-  train_df, test_df = get_data(args.train_csv, args.test_csv)
-  full, test = process_data(train_df, test_df, args.target)
-  model = classifiers[args.model](*full, n_splits=args.n_splits)
-  probs = model.predict_proba(test[0])[:, 1]
+  train_df, test_df = pd.read_csv(args.train_csv), pd.read_csv(args.test_csv)
+  (X, y), (X_test, _) = process_data(train_df, test_df, args.target)
+  model = classifiers[args.model](X, y, n_splits=args.n_splits)
+  probs = model.predict_proba(X_test)[:, 1]
   zipped = np.stack([test_df['id'], probs], axis=1)
   return np.concatenate([[['id', 'probability_'+args.target]], zipped], axis=0)
 
@@ -39,7 +35,7 @@ if __name__ == '__main__':
   p.add_argument('out_csv', type=str)
   p.add_argument('-m', '--model', type=str, default='linear')
   p.add_argument('-t', '--target', type=str, default='bernie')
-  p.add_argument('-ns', '--n_splits', type=int, default=12)
+  p.add_argument('-n', '--n_splits', type=int, default=12)
   args = p.parse_args()
   results = main(args)
   np.savetxt(args.out_csv, results, delimiter=',', fmt='%s')
