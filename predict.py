@@ -11,6 +11,7 @@ from models import classifiers
 def process_data(train_df, test_df, target):
   features = [i for i in train_df.columns if 'feature' in i]
   target = [i for i in train_df.columns if target in i]
+  assert len(target)==1
   target = target[0]
   live_mask = np.isnan(test_df[target].values)
   train = (train_df[features].values, train_df[target].values)
@@ -21,6 +22,7 @@ def process_data(train_df, test_df, target):
   return full, test
 
 def main(args):
+  np.random.seed(666420)
   train_df, test_df = pd.read_csv(args.train_csv), pd.read_csv(args.test_csv)
   (X, y), (X_test, _) = process_data(train_df, test_df, args.target)
   model = classifiers[args.model](X, y, n_splits=args.n_splits)
