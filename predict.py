@@ -35,7 +35,7 @@ if __name__ == '__main__':
   p.add_argument('out_csv', type=str)
   p.add_argument('-m', '--model', type=str, default='linear')
   p.add_argument('-t', '--target', type=str, default='bernie')
-  p.add_argument('-n', '--n_splits', type=int, default=12)
+  p.add_argument('-n', '--n_splits', type=int, default=3)
   args = p.parse_args()
   results = main(args)
   np.savetxt(args.out_csv, results, delimiter=',', fmt='%s')

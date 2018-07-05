@@ -11,7 +11,7 @@ from sklearn.ensemble import AdaBoostClassifier
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 
-def linear_model(X, y, n_splits=12, **kwargs):
+def linear_model(X, y, n_splits=3, **kwargs):
   np.random.seed(666420)
   model = Pipeline([
     ('pca', PCA(whiten=True)),
@@ -36,7 +36,7 @@ def linear_model(X, y, n_splits=12, **kwargs):
   print('CV loss: '+str(-search.best_score_))
   return search.best_estimator_
 
-def adaboost(X, y, n_splits=12, **kwargs):
+def adaboost(X, y, n_splits=3, **kwargs):
   np.random.seed(666420)
   model = AdaBoostClassifier(
     DecisionTreeClassifier(max_depth=1, min_samples_leaf=1))
