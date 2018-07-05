@@ -37,11 +37,8 @@ def linear(X, y, n_splits=3, **kwargs):
     'pca__n_components': np.arange(1, 51),
   }
   search = grid_search(model, param_grid, n_splits).fit(X, y)
-  best_params = search.best_params_
-  best_params['lr__C'] = search.best_estimator_.steps[1][1].C_[0]
-  print(best_params)
-  print(-search.best_score_)
-  return search.best_estimator_
+  search.best_params['lr__C'] = search.best_estimator_.steps[1][1].C_[0]
+  return search
 
 def adaboost(X, y, n_splits=3, **kwargs):
   model = AdaBoostClassifier(
@@ -52,9 +49,7 @@ def adaboost(X, y, n_splits=3, **kwargs):
     'learning_rate': [0.1],
   }
   search = grid_search(model, param_grid, n_splits).fit(X, y)
-  print(search.best_params_)
-  print(-search.best_score_)
-  return search.best_estimator_
+  return search
 
 def xgboost(X, y, n_splits=3, **kwargs):
   model = XGBClassifier(
@@ -71,9 +66,7 @@ def xgboost(X, y, n_splits=3, **kwargs):
     'gamma': [1, 2, 4],
   }
   search = grid_search(model, param_grid, n_splits).fit(X, y)
-  print(search.best_params_)
-  print(-search.best_score_)
-  return search.best_estimator_
+  return search
 
 classifiers = {
   'linear': linear,

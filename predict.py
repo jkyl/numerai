@@ -26,7 +26,9 @@ def main(args):
   train_df, test_df = pd.read_csv(args.train_csv), pd.read_csv(args.test_csv)
   (X, y), (X_test, _) = process_data(train_df, test_df, args.target)
   model = classifiers[args.model](X, y, n_splits=args.n_splits)
-  probs = model.predict_proba(X_test)[:, 1]
+  print('cv loss: {}'.format(-model.best_score_))
+  print('params: {}'.format(model.best_params_))
+  probs = model.best_estimator_.predict_proba(X_test)[:, 1]
   zipped = np.stack([test_df['id'], probs], axis=1)
   return np.concatenate([[['id', 'probability_'+args.target]], zipped], axis=0)
 
