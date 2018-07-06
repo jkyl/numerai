@@ -8,29 +8,33 @@ import pandas as pd
 
 from models import classifiers
 
-def process_data(train_df, test_df, target):
-  features = [i for i in train_df.columns if 'feature' in i]
-  target = [i for i in train_df.columns if target in i]
-  assert len(target)==1
-  target = target[0]
+def preprocess_data(train_df, test_df, target):
+  features = [i for i in train_df.columns if i.startswith('feature')]
+  target = 'target_'+target
+  assert target in train_df.columns
   live_mask = np.isnan(test_df[target].values)
   train = (train_df[features].values, train_df[target].values)
   test = (test_df[features].values, test_df[target].values)
   full = (
-    np.concatenate([train[0], test[0][~live_mask]], axis=0),
-    np.concatenate([train[1], test[1][~live_mask]], axis=0))
-  return full, test
+    np.concatenate([train[0], test[0][~live_mask]]),
+    np.concatenate([train[1], test[1][~live_mask]]),
+    np.concatenate([train_df['era'].values,
+                    test_df['era'][~live_mask].values]))
+  return full, test[0]
 
-def main(args):
-  np.random.seed(666420)
-  train_df, test_df = pd.read_csv(args.train_csv), pd.read_csv(args.test_csv)
-  (X, y), (X_test, _) = process_data(train_df, test_df, args.target)
-  model = classifiers[args.model](X, y, n_splits=args.n_splits)
-  print('cv loss: {}'.format(-model.best_score_))
-  print('params: {}'.format(model.best_params_))
-  probs = model.best_estimator_.predict_proba(X_test)[:, 1]
+def postprocess_results(test_df, probs, target):
   zipped = np.stack([test_df['id'], probs], axis=1)
-  return np.concatenate([[['id', 'probability_'+args.target]], zipped], axis=0)
+  prepend = np.concatenate([[['id', 'probability_' + target]], zipped])
+  return prepend
+
+def main(train_csv, test_csv, target='bernie', model='linear', **kwargs):
+  np.random.seed(666420)
+  train_df, test_df = pd.read_csv(train_csv), pd.read_csv(test_csv)
+  (X, y, eras), X_test = preprocess_data(train_df, test_df, target)
+  model = classifiers[model](X, y, eras=eras, **kwargs)
+  probs = model.predict_proba(X_test)[:, 1]
+  results = postprocess_results(test_df, probs, target)
+  return results
 
 if __name__ == '__main__':
   p = argparse.ArgumentParser()
@@ -40,6 +44,8 @@ if __name__ == '__main__':
   p.add_argument('-m', '--model', type=str, default='linear')
   p.add_argument('-t', '--target', type=str, default='bernie')
   p.add_argument('-n', '--n_splits', type=int, default=3)
+  p.add_argument('-v', '--verbose', type=int, default=2)
+  p.add_argument('-j', '--n_jobs', type=int, default=-1)
   args = p.parse_args()
-  results = main(args)
+  results = main(**args.__dict__)
   np.savetxt(args.out_csv, results, delimiter=',', fmt='%s')
