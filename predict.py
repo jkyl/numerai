@@ -43,7 +43,7 @@ if __name__ == '__main__':
   p.add_argument('out_csv', type=str)
   p.add_argument('-m', '--model', type=str, default='linear')
   p.add_argument('-t', '--target', type=str, default='bernie')
-  p.add_argument('-n', '--n_splits', type=int, default=3)
+  #p.add_argument('-n', '--n_splits', type=int, default=3)
   p.add_argument('-v', '--verbose', type=int, default=2)
   p.add_argument('-j', '--n_jobs', type=int, default=-1)
   args = p.parse_args()

@@ -10,32 +10,34 @@ from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.model_selection import StratifiedKFold, GridSearchCV, GroupKFold
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 
 from xgboost.sklearn import XGBClassifier
 from mlxtend.classifier import EnsembleVoteClassifier
 
+def group_fold(X, y, eras):
+  return list(GroupKFold(len(set(eras))).split(X, y, eras))
+
 def grid_search(
-    model, param_grid,
-    n_splits=3,
+    model, X, y, eras, param_grid,
     n_jobs=-1,
     verbose=2,
     **kwargs
   ):
   return GridSearchCV(
     model, param_grid,
-    cv=StratifiedKFold(n_splits),
+    cv=group_fold(X, y, eras),
     scoring='neg_log_loss',
     verbose=verbose,
     n_jobs=n_jobs,
     refit=True,
-  ).best_estimator_
+  ).fit(X, y)
 
-def linear(X, y, **kwargs):
+def linear(X, y, eras, **kwargs):
   model = LogisticRegressionCV(
-    Cs=np.geomspace(1e-4, 1e-2, 9),
-    cv=StratifiedKFold(kwargs['n_splits']),
+    Cs=np.geomspace(1e-4, 1e-2, 5),
+    cv=group_fold(X, y, eras),
     verbose=kwargs['verbose'],
     n_jobs=kwargs['n_jobs'],
     scoring='neg_log_loss',
@@ -49,29 +51,16 @@ def linear(X, y, **kwargs):
   print('C: '+str(model.C_[0]))
   return model
 
-def pca_linear(X, y, **kwargs):
-  model = Pipeline([
-    ('pca', PCA(whiten=True)),
-    ('lr', LogisticRegressionCV(
-      Cs=np.geomspace(1e-5, 1e-4, 3),
-      cv=StratifiedKFold(n_splits=3),
-      scoring='neg_log_loss',
-      solver='sag',
-      tol=1e-3,
-    ))
-  ])
-  param_grid = {'pca__n_components': np.arange(1, 51)}
-  return grid_search(model, param_grid, **kwargs).fit(X, y)
-
-def adaboost(X, y, **kwargs):
+def adaboost(X, y, eras, **kwargs):
   model = AdaBoostClassifier(
     DecisionTreeClassifier(max_depth=1, min_samples_leaf=1),
     learning_rate=0.1,
   )
   param_grid={'n_estimators': np.arange(2, 12)}
-  return grid_search(model, param_grid, **kwargs).fit(X, y)
+  search = grid_search(model, X, y, eras, param_grid, **kwargs).fit(X, y)
+  return search.best_estimator_
 
-def xgboost(X, y, **kwargs):
+def xgboost(X, y, eras, **kwargs):
   model = XGBClassifier(
     gamma=1,
     max_depth=1,
@@ -83,7 +72,8 @@ def xgboost(X, y, **kwargs):
     objective='binary:logistic'
   )
   param_grid={'n_estimators': [80, 100, 120]}
-  return grid_search(model, param_grid, **kwargs).fit(X, y)
+  search = grid_search(model, X, y, eras, param_grid, **kwargs).fit(X, y)
+  return search.best_estimator_
 
 def train_base_learner(X, y):
   return LogisticRegression(
@@ -122,7 +112,6 @@ def voting(X, y, eras, **kwargs):
 
 classifiers = {
   'linear': linear,
-  'pca_linear': pca_linear,
   'adaboost': adaboost,
   'xgboost': xgboost,
   'voting': voting,
