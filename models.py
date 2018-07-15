@@ -36,7 +36,7 @@ def grid_search(
 
 def linear(X, y, eras, **kwargs):
   model = LogisticRegressionCV(
-    Cs=np.geomspace(1e-4, 1e-2, 5),
+    Cs=np.geomspace(1e-4, 1e-2, 3),
     cv=group_fold(X, y, eras),
     verbose=kwargs['verbose'],
     n_jobs=kwargs['n_jobs'],
@@ -57,7 +57,7 @@ def adaboost(X, y, eras, **kwargs):
     learning_rate=0.1,
   )
   param_grid={'n_estimators': np.arange(2, 12)}
-  search = grid_search(model, X, y, eras, param_grid, **kwargs).fit(X, y)
+  search = grid_search(model, X, y, eras, param_grid, **kwargs)
   return search.best_estimator_
 
 def xgboost(X, y, eras, **kwargs):
@@ -72,7 +72,7 @@ def xgboost(X, y, eras, **kwargs):
     objective='binary:logistic'
   )
   param_grid={'n_estimators': [80, 100, 120]}
-  search = grid_search(model, X, y, eras, param_grid, **kwargs).fit(X, y)
+  search = grid_search(model, X, y, eras, param_grid, **kwargs)
   return search.best_estimator_
 
 def train_base_learner(X, y):
@@ -106,7 +106,7 @@ def voting(X, y, eras, **kwargs):
   losses = executor(joblib.delayed(validate_ensemble)(
     ensembles[i], X[mask(eras, val_era)], y[mask(eras, val_era)])
       for i, val_era in enumerate(ueras))
-  print('cv loss (unweighted): '+str(np.mean(losses)))
+  print('cv loss: '+str(np.mean(losses)))
   memory.clear(warn=False)
   return make_voting_ensemble(learners, -1)
 
