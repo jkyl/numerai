@@ -6,11 +6,9 @@ import numpy as np
 
 from sklearn.metrics import log_loss
 from sklearn.externals import joblib
-from sklearn.pipeline import Pipeline
-from sklearn.decomposition import PCA
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier
-from sklearn.model_selection import StratifiedKFold, GridSearchCV, GroupKFold
+from sklearn.model_selection import GridSearchCV, GroupKFold
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 
 from xgboost.sklearn import XGBClassifier
@@ -52,10 +50,8 @@ def linear(X, y, eras, **kwargs):
   return model
 
 def adaboost(X, y, eras, **kwargs):
-  model = AdaBoostClassifier(
-    DecisionTreeClassifier(max_depth=1, min_samples_leaf=1),
-    learning_rate=0.1,
-  )
+  model = AdaBoostClassifier(DecisionTreeClassifier(
+    max_depth=1, min_samples_leaf=1), learning_rate=0.1)
   param_grid={'n_estimators': np.arange(2, 12)}
   search = grid_search(model, X, y, eras, param_grid, **kwargs)
   return search.best_estimator_
@@ -77,13 +73,12 @@ def xgboost(X, y, eras, **kwargs):
 
 def train_base_learner(X, y):
   return LogisticRegression(
-    C=1e-1, solver='sag', tol=1e-4, max_iter=1000
-  ).fit(X, y)
+    C=0.1, solver='sag', tol=1e-4, max_iter=1000).fit(X, y)
 
 def make_voting_ensemble(learners, k):
   return EnsembleVoteClassifier(
     [learners[i] for i in range(len(learners)) if i != k],
-    refit=False).fit([[0], [1]], [0, 1])
+      refit=False, voting='soft').fit([[0], [1]], [0, 1])
 
 def validate_ensemble(ensemble, X, y):
   probs = ensemble.predict_proba(X)[:, 1]
