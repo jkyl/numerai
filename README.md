@@ -14,4 +14,4 @@ Classify encrypted financial data for the crowdsourced hedge fund [numer.ai](htt
 * gradient-boosted trees
 * voting ensemble (current leader)
 
-All rely on cross-validation across eras for hyperparameter optimization, and are optimized for multiprocessing. 
+All rely on cross-validation across eras for hyperparameter optimization, and are parallelized using joblib. 
