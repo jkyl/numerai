@@ -10,7 +10,6 @@ Classify encrypted financial data for the crowdsourced hedge fund [numer.ai](htt
 
 ### Algorithms:
 * logistic regression
-* adaboost
 * gradient-boosted trees
 * voting ensemble (current leader)
 
