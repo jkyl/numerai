@@ -8,13 +8,14 @@ import pandas as pd
 
 from models import classifiers
 
+
 def preprocess_data(train_df, test_df, target):
   features = [i for i in train_df.columns if i.startswith('feature')]
   target = 'target_'+target
   assert target in train_df.columns
   live_mask = np.isnan(test_df[target].values)
-  train = (train_df[features].values, train_df[target].values)
-  test = (test_df[features].values, test_df[target].values)
+  train = (train_df[features].values, train_df[target].values.astype(bool))
+  test = (test_df[features].values, test_df[target].values.astype(bool))
   full = (
     np.concatenate([train[0], test[0][~live_mask]]),
     np.concatenate([train[1], test[1][~live_mask]]),
@@ -22,19 +23,22 @@ def preprocess_data(train_df, test_df, target):
                     test_df['era'][~live_mask].values]))
   return full, test[0]
 
+
 def postprocess_results(test_df, probs, target):
   zipped = np.stack([test_df['id'], probs], axis=1)
   prepend = np.concatenate([[['id', 'probability_' + target]], zipped])
   return prepend
 
-def main(train_csv, test_csv, target='bernie', model='linear', **kwargs):
+
+def main(train_csv, test_csv, target, model, verbose, n_jobs, **kwargs):
   np.random.seed(666420)
   train_df, test_df = pd.read_csv(train_csv), pd.read_csv(test_csv)
   (X, y, eras), X_test = preprocess_data(train_df, test_df, target)
-  model = classifiers[model](X, y, eras=eras, **kwargs)
+  model = classifiers[model](X, y, eras=eras, verbose=verbose, n_jobs=n_jobs)
   probs = model.predict_proba(X_test)[:, 1]
   results = postprocess_results(test_df, probs, target)
   return results
+
 
 if __name__ == '__main__':
   p = argparse.ArgumentParser()

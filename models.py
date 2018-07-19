@@ -4,95 +4,101 @@ from __future__ import division
 
 import numpy as np
 
-from sklearn.metrics import log_loss
 from sklearn.externals import joblib
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.model_selection import GridSearchCV, GroupKFold
+from sklearn.metrics import log_loss
+from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 
 from xgboost.sklearn import XGBClassifier
 from mlxtend.classifier import EnsembleVoteClassifier
 
-def group_fold(X, y, eras):
-  return list(GroupKFold(len(set(eras))).split(X, y, eras))
 
-def grid_search(
-    model, X, y, eras, param_grid,
-    n_jobs=-1,
-    verbose=2,
-    **kwargs
-  ):
+def era_split(eras):
+  splits = []
+  for val_era in np.unique(eras):
+    val_mask = eras==val_era
+    splits.append((np.where(~val_mask)[0], np.where(val_mask)[0]))
+  return splits
+
+
+def weight_samples_by_era(eras):
+  ueras = np.unique(eras)
+  weights = np.ones(eras.size)
+  for era in ueras:
+    mask = eras==era
+    weights[mask] = eras.size / (mask.sum() * len(ueras))
+  return weights
+
+
+def grid_search(model, eras, param_grid, n_jobs=-1, verbose=2):
   return GridSearchCV(
     model, param_grid,
-    cv=group_fold(X, y, eras),
+    cv=era_split(eras),
     scoring='neg_log_loss',
     verbose=verbose,
     n_jobs=n_jobs,
-    refit=True,
-  ).fit(X, y)
+    refit=True)
 
-def linear(X, y, eras, **kwargs):
+
+def linear(X, y, eras, verbose=2, n_jobs=-1):
+  sample_weight = weight_samples_by_era(eras)
   model = LogisticRegressionCV(
-    Cs=np.geomspace(1e-4, 1e-2, 3),
-    cv=group_fold(X, y, eras),
-    verbose=kwargs['verbose'],
-    n_jobs=kwargs['n_jobs'],
-    scoring='neg_log_loss',
     solver='lbfgs',
-    max_iter=1000,
     tol=1e-4,
-  ).fit(X, y)
-  for v in model.scores_.values():
-    print('mean: '+str(-v.mean(0)))
-    print('std:  '+str(v.std(0)))
+    max_iter=1000,
+    Cs=[1e-3],#, 1e-2],
+    cv=era_split(eras),
+    scoring='neg_log_loss',
+    verbose=verbose,
+    n_jobs=n_jobs,
+  ).fit(X, y, sample_weight)
+  print('cv loss: '+str(min(-model.scores_[True].mean(0))))
   print('C: '+str(model.C_[0]))
   return model
 
-def adaboost(X, y, eras, **kwargs):
-  model = AdaBoostClassifier(DecisionTreeClassifier(
-    max_depth=1, min_samples_leaf=1), learning_rate=0.1)
-  param_grid={'n_estimators': np.arange(2, 12)}
-  search = grid_search(model, X, y, eras, param_grid, **kwargs)
-  return search.best_estimator_
 
-def xgboost(X, y, eras, **kwargs):
+def xgboost(X, y, eras, verbose=2, n_jobs=-1):
+  sample_weight = weight_samples_by_era(eras)
   model = XGBClassifier(
-    gamma=1,
+    gamma=0.1,
     max_depth=1,
-    subsample=0.8,
-    reg_lambda=0.1,
+    subsample=1,
+    reg_lambda=1,
     learning_rate=0.1,
     min_child_weight=1,
     colsample_bytree=1,
-    objective='binary:logistic'
-  )
-  param_grid={'n_estimators': [80, 100, 120]}
-  search = grid_search(model, X, y, eras, param_grid, **kwargs)
+    n_estimators=100,
+    objective='binary:logistic')
+  param_grid={}
+  search = grid_search(model, eras, param_grid, verbose=verbose, n_jobs=n_jobs)
+  search.fit(X, y, sample_weight=sample_weight)
+  print(search.best_score_)
   return search.best_estimator_
+
 
 def train_base_learner(X, y):
   return LogisticRegression(
     C=0.1, solver='sag', tol=1e-4, max_iter=1000).fit(X, y)
+
 
 def make_voting_ensemble(learners, k):
   return EnsembleVoteClassifier(
     [learners[i] for i in range(len(learners)) if i != k],
       refit=False, voting='soft').fit([[0], [1]], [0, 1])
 
+
 def validate_ensemble(ensemble, X, y):
   probs = ensemble.predict_proba(X)[:, 1]
   return log_loss(y, probs)
 
-def voting(X, y, eras, **kwargs):
+
+def voting(X, y, eras, verbose=2, n_jobs=-1):
   memory = joblib.Memory('/tmp/joblib', verbose=0)
   @memory.cache(ignore=['eras'])
   def mask(eras, era):
-    return eras == era
+    return np.where(eras == era)
   ueras = np.unique(eras)
-  executor = joblib.Parallel(
-    n_jobs=kwargs['n_jobs'],
-    verbose=kwargs['verbose'])
+  executor = joblib.Parallel(n_jobs=n_jobs, verbose=verbose)
   learners = executor(joblib.delayed(train_base_learner)(
     X[mask(eras, train_era)], y[mask(eras, train_era)])
       for train_era in ueras)
@@ -105,9 +111,9 @@ def voting(X, y, eras, **kwargs):
   memory.clear(warn=False)
   return make_voting_ensemble(learners, -1)
 
+
 classifiers = {
   'linear': linear,
-  'adaboost': adaboost,
   'xgboost': xgboost,
   'voting': voting,
 }
