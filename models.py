@@ -7,6 +7,7 @@ import numpy as np
 from sklearn.externals import joblib
 from sklearn.metrics import log_loss
 from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 
 from xgboost.sklearn import XGBClassifier
@@ -26,11 +27,11 @@ def weight_samples_by_era(eras):
   weights = np.ones(eras.size)
   for era in ueras:
     mask = eras==era
-    weights[mask] = eras.size / (mask.sum() * len(ueras))
+    weights[mask] = eras.size / float(mask.sum() * len(ueras))
   return weights
 
 
-def grid_search(model, eras, param_grid, n_jobs=-1, verbose=2):
+def grid_search(model, param_grid, eras, n_jobs=-1, verbose=2):
   return GridSearchCV(
     model, param_grid,
     cv=era_split(eras),
@@ -46,15 +47,28 @@ def linear(X, y, eras, verbose=2, n_jobs=-1):
     solver='lbfgs',
     tol=1e-4,
     max_iter=1000,
-    Cs=[1e-3],#, 1e-2],
+    Cs=[1e-3],
     cv=era_split(eras),
     scoring='neg_log_loss',
     verbose=verbose,
     n_jobs=n_jobs,
-  ).fit(X, y, sample_weight)
+  ).fit(X, y, sample_weight=sample_weight)
   print('cv loss: '+str(min(-model.scores_[True].mean(0))))
   print('C: '+str(model.C_[0]))
   return model
+
+
+def forest(X, y, eras, verbose=2, n_jobs=-1):
+  sample_weight = weight_samples_by_era(eras)
+  search = grid_search(
+    RandomForestClassifier(
+      max_depth=1,
+    ), {'n_estimators': [1, 10, 100]}, eras,
+    verbose=verbose, n_jobs=n_jobs
+  ).fit(X, y, sample_weight=sample_weight)
+  print(search.best_params_)
+  print(search.best_score_)
+  return search.best_estimator_
 
 
 def xgboost(X, y, eras, verbose=2, n_jobs=-1):
@@ -70,7 +84,7 @@ def xgboost(X, y, eras, verbose=2, n_jobs=-1):
     n_estimators=100,
     objective='binary:logistic')
   param_grid={}
-  search = grid_search(model, eras, param_grid, verbose=verbose, n_jobs=n_jobs)
+  search = grid_search(model, param_grid, eras, verbose=verbose, n_jobs=n_jobs)
   search.fit(X, y, sample_weight=sample_weight)
   print(search.best_score_)
   return search.best_estimator_
@@ -83,7 +97,7 @@ def train_base_learner(X, y):
 
 def make_voting_ensemble(learners, k):
   return EnsembleVoteClassifier(
-    [learners[i] for i in range(len(learners)) if i != k],
+    [l for i, l in enumerate(learners) if i != k],
       refit=False, voting='soft').fit([[0], [1]], [0, 1])
 
 
@@ -93,10 +107,8 @@ def validate_ensemble(ensemble, X, y):
 
 
 def voting(X, y, eras, verbose=2, n_jobs=-1):
-  memory = joblib.Memory('/tmp/joblib', verbose=0)
-  @memory.cache(ignore=['eras'])
   def mask(eras, era):
-    return np.where(eras == era)
+    return np.where(eras==era)[0]
   ueras = np.unique(eras)
   executor = joblib.Parallel(n_jobs=n_jobs, verbose=verbose)
   learners = executor(joblib.delayed(train_base_learner)(
@@ -108,12 +120,12 @@ def voting(X, y, eras, verbose=2, n_jobs=-1):
     ensembles[i], X[mask(eras, val_era)], y[mask(eras, val_era)])
       for i, val_era in enumerate(ueras))
   print('cv loss: '+str(np.mean(losses)))
-  memory.clear(warn=False)
   return make_voting_ensemble(learners, -1)
 
 
 classifiers = {
   'linear': linear,
+  'forest': forest,
   'xgboost': xgboost,
   'voting': voting,
 }
