@@ -62,8 +62,8 @@ def forest(X, y, eras, verbose=2, n_jobs=-1):
   sample_weight = weight_samples_by_era(eras)
   search = grid_search(
     RandomForestClassifier(
-      max_depth=1,
-    ), {'n_estimators': [1, 10, 100]}, eras,
+      max_depth=1, criterion='entropy',
+    ), {'n_estimators': np.arange(50, 70)}, eras,
     verbose=verbose, n_jobs=n_jobs
   ).fit(X, y, sample_weight=sample_weight)
   print(search.best_params_)

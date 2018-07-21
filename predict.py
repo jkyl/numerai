@@ -19,13 +19,14 @@ def preprocess_data(train_df, test_df, target):
   full = (
     np.concatenate([train[0], test[0][~live_mask]]),
     np.concatenate([train[1], test[1][~live_mask]]),
-    np.concatenate([train_df['era'].values,
-                    test_df['era'][~live_mask].values]))
+    np.array([int(s[3:]) for s in np.concatenate(
+      [train_df['era'].values, test_df['era'][~live_mask].values])])
+  )
   return full, test[0]
 
 
-def postprocess_results(test_df, probs, target):
-  zipped = np.stack([test_df['id'], probs], axis=1)
+def postprocess_results(ids, probs, target):
+  zipped = np.stack([ids, probs], axis=1)
   prepend = np.concatenate([[['id', 'probability_' + target]], zipped])
   return prepend
 
@@ -36,7 +37,7 @@ def main(train_csv, test_csv, target, model, verbose, n_jobs, **kwargs):
   (X, y, eras), X_test = preprocess_data(train_df, test_df, target)
   model = classifiers[model](X, y, eras=eras, verbose=verbose, n_jobs=n_jobs)
   probs = model.predict_proba(X_test)[:, 1]
-  results = postprocess_results(test_df, probs, target)
+  results = postprocess_results(test_df['id'], probs, target)
   return results
 
 
@@ -45,7 +46,7 @@ if __name__ == '__main__':
   p.add_argument('train_csv', type=str)
   p.add_argument('test_csv', type=str)
   p.add_argument('out_csv', type=str)
-  p.add_argument('-m', '--model', type=str, default='linear')
+  p.add_argument('-m', '--model', type=str, default='voting')
   p.add_argument('-t', '--target', type=str, default='bernie')
   p.add_argument('-v', '--verbose', type=int, default=2)
   p.add_argument('-j', '--n_jobs', type=int, default=-1)
