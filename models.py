@@ -7,8 +7,8 @@ import numpy as np
 from sklearn.externals import joblib
 from sklearn.metrics import log_loss
 from sklearn.model_selection import GridSearchCV
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+from sklearn.neural_network import MLPClassifier
 
 from xgboost.sklearn import XGBClassifier
 from mlxtend.classifier import EnsembleVoteClassifier
@@ -58,19 +58,6 @@ def linear(X, y, eras, verbose=2, n_jobs=-1):
   return model
 
 
-def forest(X, y, eras, verbose=2, n_jobs=-1):
-  sample_weight = weight_samples_by_era(eras)
-  search = grid_search(
-    RandomForestClassifier(
-      max_depth=1, criterion='entropy',
-    ), {'n_estimators': np.arange(50, 70)}, eras,
-    verbose=verbose, n_jobs=n_jobs
-  ).fit(X, y, sample_weight=sample_weight)
-  print(search.best_params_)
-  print(search.best_score_)
-  return search.best_estimator_
-
-
 def xgboost(X, y, eras, verbose=2, n_jobs=-1):
   sample_weight = weight_samples_by_era(eras)
   model = XGBClassifier(
@@ -114,8 +101,7 @@ def voting(X, y, eras, verbose=2, n_jobs=-1):
   learners = executor(joblib.delayed(train_base_learner)(
     X[mask(eras, train_era)], y[mask(eras, train_era)])
       for train_era in ueras)
-  ensembles = executor(joblib.delayed(make_voting_ensemble)(
-    learners, k) for k in range(len(ueras)))
+  ensembles = [make_voting_ensemble(learners, k) for k in range(len(ueras))]
   losses = executor(joblib.delayed(validate_ensemble)(
     ensembles[i], X[mask(eras, val_era)], y[mask(eras, val_era)])
       for i, val_era in enumerate(ueras))
@@ -125,7 +111,6 @@ def voting(X, y, eras, verbose=2, n_jobs=-1):
 
 classifiers = {
   'linear': linear,
-  'forest': forest,
   'xgboost': xgboost,
   'voting': voting,
 }
