@@ -5,6 +5,7 @@ Classify encrypted financial data for the crowdsourced hedge fund [numer.ai](htt
 * numpy
 * pandas
 * scikit-learn
+* tensorflow
 * mlxtend
 * xgboost
 
