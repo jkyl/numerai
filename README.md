@@ -5,12 +5,16 @@ Classify encrypted financial data for the crowdsourced hedge fund [numer.ai](htt
 * numpy
 * pandas
 * scikit-learn
+* tensorflow
 * mlxtend
 * xgboost
 
 ### Algorithms:
 * logistic regression
 * gradient-boosted trees
-* voting ensemble (current leader)
+* voting ensemble
+  * genetic hyperparameter search
+  * gradient descent hyperparameter search *
+##### `*` indicates current leader
 
 All rely on cross-validation across eras for hyperparameter optimization, and are parallelized using joblib. 
