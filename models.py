@@ -3,15 +3,15 @@ from __future__ import print_function
 from __future__ import division
 
 import numpy as np
+import joblib
 
-from sklearn.externals import joblib
 from sklearn.metrics import log_loss
 from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-from sklearn.neural_network import MLPClassifier
 
 from xgboost.sklearn import XGBClassifier
 from mlxtend.classifier import EnsembleVoteClassifier
+
 
 __author__ = 'Jonathan Kyl'
 
@@ -186,9 +186,7 @@ def voting(X, y, eras, verbose=2, n_jobs=-1):
   print('cv loss: '+str(np.mean(losses)))
   return make_voting_ensemble(learners, -1)
 
-# so we can do:
-#   from models import classifiers
-#   model = classifiers[args.model]
+
 classifiers = {
   'linear': linear,
   'xgboost': xgboost,
