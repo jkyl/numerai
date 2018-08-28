@@ -15,6 +15,10 @@ import pandas as pd
 from models import classifiers
 
 
+tournaments = dict(zip([
+  'bernie', 'elizabeth', 'jordan', 'ken', 'charles'], range(1, 6)))
+
+
 def preprocess_data(train_df, test_df, target):
   features = [i for i in train_df.columns if i.startswith('feature')]
   target = 'target_'+target
@@ -61,7 +65,7 @@ def predict(round_dir, target, model, verbose, n_jobs, **kwargs):
 
 def main(args):
   api = numerapi.NumerAPI(
-    verbosity='debug',
+    verbosity='debug' if args.verbose else 'critical',
     secret_key=credentials.key,
     public_id=credentials.id)
   current_round = api.get_current_round()
@@ -71,15 +75,17 @@ def main(args):
     raise ValueError('round {} does not exist (latest == {})'
        .format(args.round, current_round))
   round_dir = download(api, args.round, args.datadir)
-  results = predict(round_dir, **args.__dict__)
-  output_file = os.path.join(round_dir,
-    'results_target-{}_model-{}.csv'.format(args.target, args.model))
-  np.savetxt(output_file, results, delimiter=',', fmt='%s')
-  if args.upload:
-    tournament = dict(zip(
-      ['bernie', 'elizabeth', 'jordan', 'ken', 'charles'],
-      range(1, 6)))[args.target]
-    api.upload_predictions(output_file, tournament)
+  targets = tournaments.keys() if args.target=='all' else [args.target]
+  args.__dict__.pop('target')
+  for target in targets:
+    print(target)
+    results = predict(round_dir, target, **args.__dict__)
+    output_file = os.path.join(round_dir,
+      'results_target-{}_model-{}.csv'.format(target, args.model))
+    np.savetxt(output_file, results, delimiter=',', fmt='%s')
+    if args.upload:
+      tournament = tournaments[target]
+      api.upload_predictions(output_file, tournament)
 
 
 if __name__ == '__main__':
@@ -87,9 +93,9 @@ if __name__ == '__main__':
   p.add_argument('-d', '--datadir', type=str, default='/Volumes/4TB/numerai')
   p.add_argument('-m', '--model', type=str, default='voting')
   p.add_argument('-r', '--round', type=str, default='latest')
-  p.add_argument('-t', '--target', type=str, default='bernie')
+  p.add_argument('-t', '--target', type=str, default='all')
   p.add_argument('-u', '--upload', action='store_true', default=False)
-  p.add_argument('-v', '--verbose', type=int, default=2)
+  p.add_argument('-v', '--verbose', type=int, default=1)
   p.add_argument('-j', '--n_jobs', type=int, default=-1)
   args = p.parse_args()
   main(args)
